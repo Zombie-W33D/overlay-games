@@ -34,8 +34,10 @@ bounce. Entry became: `..., widget = true`.
 
 ### Known limitations (widget mode)
 
-- **No auto-focus** — widget-flagged windows aren't automatically
-  focused/activated when hovered. Known bug, to be handled later.
+- **Auto-focus is a little buggy** — a hovered widget may not be focused
+  immediately. If it doesn't respect auto-focus right away, several manual
+  focus changes seem to bring auto-focus into a working state from that point
+  on. Known bug, to be handled later.
 - **No quickshell auto-avoid** — widget games are never resized/moved to line
   up with the bar. Deliberate: games that don't support dynamic resize get
   messed up by forced repositions, which causes jittering. Trade-off: an
