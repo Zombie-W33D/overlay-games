@@ -49,7 +49,10 @@ def write_entries(lua_path, entries):
     start = text.index(BEGIN)
     end = text.index(END, start)
     block = _render(entries)
-    new_text = text[:start] + block + text[end + len(END):]
+    tail = text[end + len(END):]
+    if tail and not tail.startswith("\n"):
+        tail = "\n" + tail
+    new_text = text[:start] + block + tail
     with open(lua_path, "w", encoding="utf-8") as f:
         f.write(new_text)
 
@@ -64,7 +67,7 @@ def _render(entries):
         lines.append('  { kind = "%s", class = "%s", name = "%s"%s },' % (kind, cls, name, widget))
     lines.append("}")
     lines.append(END)
-    return "\n".join(lines) + "\n"
+    return "\n".join(lines)
 
 
 def _block(text):

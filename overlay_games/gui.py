@@ -6,7 +6,7 @@ def run(args):
     )
     from PySide6.QtCore import Qt, QSize
 
-    from . import actions, lua_registry, steam, trust_conf, hypr
+    from . import actions, lua_registry, steam, steam_config, trust_conf, hypr
 
     app = QApplication.instance() or QApplication([])
     app.setApplicationName("Overlay Games")
@@ -55,26 +55,32 @@ def run(args):
             self.resize(760, 420)
 
             left = QVBoxLayout()
-            left.addWidget(QLabel("Registered as overlay"))
-            self.registered = QListWidget()
-            left.addWidget(self.registered)
+            left.addWidget(QLabel("Installed Steam games"))
+            self.steam_list = QListWidget()
+            left.addWidget(self.steam_list)
 
             right = QVBoxLayout()
-            right.addWidget(QLabel("Installed Steam games"))
-            self.steam_list = QListWidget()
-            right.addWidget(self.steam_list)
+            right.addWidget(QLabel("Registered as overlay"))
+            self.registered = QListWidget()
+            right.addWidget(self.registered)
 
             middle = QVBoxLayout()
             self.widget_chk = QCheckBox("widget mode (lets it size itself)")
             self.widget_chk.setToolTip(
                 "For idle/desktop-pet games that expand by cursor hover: keeps float + "
                 "click-through but the game controls its own size (no full-screen enforcement).")
+            self.steam_setup_chk = QCheckBox("Steam: launch options + GE-Proton")
+            self.steam_setup_chk.setToolTip(
+                "Also writes WINE_LAYERED_OVERLAY_ALPHA=1 WINE_LAYERED_OVERLAY_INPUT_SHAPE=1 "
+                "into Steam launch options and forces the detected GE-Proton compat tool.\n"
+                "Works only when registering a Steam game.")
             self.btn_add = QPushButton("Register →")
             self.btn_remove = QPushButton("← Unregister")
             self.btn_local = QPushButton("Add local game…")
             self.btn_refresh = QPushButton("Refresh")
             middle.addStretch(1)
             middle.addWidget(self.widget_chk)
+            middle.addWidget(self.steam_setup_chk)
             for b in (self.btn_add, self.btn_remove, self.btn_local, self.btn_refresh):
                 middle.addWidget(b)
             middle.addStretch(1)
@@ -116,7 +122,34 @@ def run(args):
                 it.setData(Qt.UserRole, g["appid"])
                 it.setFlags(it.flags() & ~Qt.ItemIsSelectable if reg else it.flags())
                 self.steam_list.addItem(it)
-            self.status.setText("config: %s" % args.config)
+            self.ge_name = steam_config.detect_ge_proton()
+            steam_alive = steam_config.steam_is_running()
+            if self.ge_name and steam_alive:
+                self.steam_setup_chk.setEnabled(True)
+                self.steam_setup_chk.setChecked(True)
+                self.steam_setup_chk.setText("Steam: launch options + %s" % self.ge_name)
+                self.steam_setup_chk.setToolTip(
+                    "Steam is running — it keeps these in memory and rewrites the "
+                    "files when it exits, so the write may not survive. The tool "
+                    "will warn after registering if so.")
+                self.status.setText("config: %s — Steam is running" % args.config)
+            elif self.ge_name:
+                self.steam_setup_chk.setEnabled(True)
+                self.steam_setup_chk.setChecked(True)
+                self.steam_setup_chk.setText("Steam: launch options + %s" % self.ge_name)
+                self.steam_setup_chk.setToolTip(
+                    "Also writes WINE_LAYERED_OVERLAY_ALPHA=1 WINE_LAYERED_OVERLAY_INPUT_SHAPE=1 "
+                    "into Steam launch options and forces the detected GE-Proton compat tool.\n"
+                    "Works only when registering a Steam game. Steam must be restarted after.")
+                self.status.setText("config: %s" % args.config)
+            else:
+                self.steam_setup_chk.setEnabled(False)
+                self.steam_setup_chk.setChecked(False)
+                self.steam_setup_chk.setText("Steam setup (no GE-Proton detected)")
+                self.steam_setup_chk.setToolTip(
+                    "No GE-Proton compatibility tool found in Steam yet. Force a "
+                    "GE-Proton tool on any game in Steam first, then refresh.")
+                self.status.setText("config: %s" % args.config)
 
         def _on_add(self):
             item = self.steam_list.currentItem()
@@ -130,7 +163,21 @@ def run(args):
             except actions.ActionError as e:
                 QMessageBox.warning(self, "overlay-games", str(e))
                 return
-            self._after_change("registered Steam %s" % appid)
+            setup_msg = ""
+            if self.steam_setup_chk.isChecked():
+                try:
+                    setup_msg = steam_config.apply_steam_setup(appid, self.ge_name)
+                    if steam_config.steam_is_running():
+                        QMessageBox.information(
+                            self, "overlay-games",
+                            "Steam launch options + GE-Proton written.\n\n"
+                            "But Steam is running and keeps its config in memory: it can "
+                            "overwrite these files when it exits, so the change may not stick.\n\n"
+                            "Fully quit Steam (Steam menu → Exit), relaunch it, then start the "
+                            "game. Use 'list --steam-setup' to verify what Steam actually has.")
+                except steam_config.SteamConfigError as e:
+                    setup_msg = "Steam setup skipped: %s" % e
+            self._after_change("registered Steam %s" % appid, extra=setup_msg)
 
         def _on_remove(self):
             item = self.registered.currentItem()
@@ -169,7 +216,7 @@ def run(args):
                 return
             self._after_change("registered local %s" % cls)
 
-        def _after_change(self, msg):
+        def _after_change(self, msg, extra=""):
             ok, how = actions.reload_hypr()
             warn = ""
             try:
@@ -179,7 +226,8 @@ def run(args):
             self.refresh()
             if not ok:
                 QMessageBox.warning(self, "overlay-games", "config errors:\n" + how)
-            self.status.setText("%s — reload %s%s" % (msg, "ok" if ok else "FAILED", warn))
+            self.status.setText("%s — reload %s%s%s" % (msg, "ok" if ok else "FAILED", warn,
+                                                        ("  " + extra) if extra else ""))
 
     w = Main()
     w.show()

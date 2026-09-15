@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from . import actions, lua_registry, steam, trust_conf
+from . import actions, lua_registry, steam, steam_config, trust_conf
 from .paths import DEFAULT_LUA, DEFAULT_TRUST
 
 
@@ -18,6 +18,9 @@ def build_parser():
 
     lp = sub.add_parser("list", help="list registered overlay games and installed Steam games")
     lp.add_argument("--installed", action="store_true", help="also list every installed Steam game")
+    lp.add_argument("--steam-setup", action="store_true", help=(
+        "for each registered Steam game, show the launch options + compat tool "
+        "currently in Steam's config (use to verify --steam-setup actually stuck)"))
 
     ap = sub.add_parser("add", help="register a game as an overlay")
     ap.add_argument("--steam", dest="steam_appid", metavar="APPID", help="Steam app id")
@@ -26,6 +29,9 @@ def build_parser():
     ap.add_argument("--widget", action="store_true", help=(
         "idle/desktop-pet game: keep float + click-through but let it size itself "
         "(no full-screen overlay enforcement, no hover bounce)"))
+    ap.add_argument("--steam-setup", action="store_true", help=(
+        "also write Steam launch options (WINE_LAYERED_OVERLAY_*) and force "
+        "GE-Proton for --steam games (only useful with --steam APPID)"))
 
     rp = sub.add_parser("remove", help="unregister a game")
     rp.add_argument("--steam", dest="steam_appid", metavar="APPID", help="Steam app id")
@@ -51,6 +57,11 @@ def main(argv=None):
                 cls = actions.add_steam(args.config, args.steam_appid,
                                         args.name or (g["name"] if g else None),
                                         widget=args.widget)
+                if args.steam_setup:
+                    try:
+                        print(steam_config.apply_steam_setup(args.steam_appid))
+                    except steam_config.SteamConfigError as e:
+                        print("warning: Steam setup skipped: %s" % e, file=sys.stderr)
             elif args.local_class:
                 cls = actions.add_local(args.config, args.trust, args.local_class,
                                         args.name or "", widget=args.widget)
@@ -89,6 +100,18 @@ def _list(args):
     for e in entries:
         tag = "steam" if e["kind"] == "steam" else "local"
         print("  [%s] %-32s %s" % (tag, e["name"], e["class"]))
+    if args.steam_setup:
+        print("\nSteam config state (from localconfig.vdf / config.vdf):")
+        print("  running: %s" % ("yes — edits while running can be overwritten on exit" if steam_config.steam_is_running() else "no"))
+        for e in entries:
+            if e["kind"] != "steam":
+                continue
+            appid = e["class"].split("_")[-1]
+            launch = steam_config.get_launch_options(appid)
+            tool = steam_config.get_compat_tool(appid)
+            lval = "ok" if launch == steam_config.LAUNCH_OPTIONS else ("custom: " + launch if launch else "NOT SET")
+            tval = "ok" if "GE-Proton" in tool else (tool or "none")
+            print("  %-9s launch: %-14s compat: %s" % (appid, lval, tval))
     if args.installed:
         print("\ninstalled Steam games:")
         for g in steam.installed_games():
