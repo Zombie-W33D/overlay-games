@@ -39,6 +39,9 @@ bounce. Entry became: `..., widget = true`.
   regular (non-widget) launch, but happens sometimes in both. The same
   workaround kicks it into a reliable state from then on: a few manual focus
   changes. Note for later investigation.
+- **Cursor warp to screen center on focus-out** — sometimes when focus changes
+  from the game to something else, the mouse jumps to the center of the
+  screen. Fix soon.
 - **No quickshell auto-avoid** — widget games are never resized/moved to line
   up with the bar. Deliberate: games that don't support dynamic resize get
   messed up by forced repositions, which causes jittering. Trade-off: an
