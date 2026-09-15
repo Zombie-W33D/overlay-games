@@ -1,6 +1,6 @@
 def run(args):
     from PySide6.QtWidgets import (
-        QApplication, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel,
+        QApplication, QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel,
         QLineEdit, QComboBox, QListWidget, QPushButton, QSplitter, QVBoxLayout,
         QListWidgetItem, QMessageBox, QWidget,
     )
@@ -18,6 +18,7 @@ def run(args):
             form = QFormLayout(self)
             self.cls = QLineEdit()
             self.name = QLineEdit()
+            self.widget = QCheckBox("widget mode (idle/desktop-pet: lets the game size itself)")
             self.picker = QComboBox()
             self.picker.setEditable(False)
             wins = hypr.running_windows()
@@ -32,6 +33,7 @@ def run(args):
             form.addRow("Source", self.picker)
             form.addRow("Window class", self.cls)
             form.addRow("Display name", self.name)
+            form.addRow(self.widget)
             btns = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
             btns.accepted.connect(self.accept)
             btns.rejected.connect(self.reject)
@@ -42,7 +44,9 @@ def run(args):
                 self.cls.setText(self.picker.currentData())
 
         def values(self):
-            return self.cls.text().strip(), (self.name.text() or self.cls.text().strip())
+            return (self.cls.text().strip(),
+                    (self.name.text() or self.cls.text()).strip(),
+                    self.widget.isChecked())
 
     class Main(QWidget):
         def __init__(self):
@@ -61,11 +65,16 @@ def run(args):
             right.addWidget(self.steam_list)
 
             middle = QVBoxLayout()
+            self.widget_chk = QCheckBox("widget mode (lets it size itself)")
+            self.widget_chk.setToolTip(
+                "For idle/desktop-pet games that expand by cursor hover: keeps float + "
+                "click-through but the game controls its own size (no full-screen enforcement).")
             self.btn_add = QPushButton("Register →")
             self.btn_remove = QPushButton("← Unregister")
             self.btn_local = QPushButton("Add local game…")
             self.btn_refresh = QPushButton("Refresh")
             middle.addStretch(1)
+            middle.addWidget(self.widget_chk)
             for b in (self.btn_add, self.btn_remove, self.btn_local, self.btn_refresh):
                 middle.addWidget(b)
             middle.addStretch(1)
@@ -95,7 +104,8 @@ def run(args):
             self.registered.clear()
             for e in lua_registry.read_entries(args.config):
                 tag = "steam" if e["kind"] == "steam" else "local"
-                it = QListWidgetItem("%s  (%s)  [%s]" % (e["name"], e["class"], tag))
+                widget = " [widget]" if e.get("widget") else ""
+                it = QListWidgetItem("%s  (%s)  [%s]%s" % (e["name"], e["class"], tag, widget))
                 it.setData(Qt.UserRole, e["class"])
                 self.registered.addItem(it)
             self.steam_list.clear()
@@ -115,7 +125,8 @@ def run(args):
             appid = item.data(Qt.UserRole)
             g = steam.app_by_id(appid)
             try:
-                actions.add_steam(args.config, appid, g["name"] if g else None)
+                actions.add_steam(args.config, appid, g["name"] if g else None,
+                                  widget=self.widget_chk.isChecked())
             except actions.ActionError as e:
                 QMessageBox.warning(self, "overlay-games", str(e))
                 return
@@ -150,9 +161,9 @@ def run(args):
             dlg = LocalGameDialog(self)
             if dlg.exec() != QDialog.Accepted:
                 return
-            cls, name = dlg.values()
+            cls, name, widget = dlg.values()
             try:
-                actions.add_local(args.config, args.trust, cls, name)
+                actions.add_local(args.config, args.trust, cls, name, widget=widget)
             except actions.ActionError as e:
                 QMessageBox.warning(self, "overlay-games", str(e))
                 return

@@ -35,12 +35,12 @@ def _write_registry(lua_path, entries):
         raise ActionError(str(e))
 
 
-def add_steam(lua_path, appid, name=None):
+def add_steam(lua_path, appid, name=None, widget=False):
     entries = lua_registry.read_entries(lua_path)
     cls = lua_registry.steamp_class(appid)
     if any(e["class"] == cls for e in entries):
         raise ActionError("already registered: %s" % cls)
-    entries.append({"kind": "steam", "class": cls, "name": name or ("Steam " + str(appid))})
+    entries.append({"kind": "steam", "class": cls, "name": name or ("Steam " + str(appid)), "widget": bool(widget)})
     _write_registry(lua_path, entries)
     return cls
 
@@ -55,7 +55,7 @@ def remove_steam(lua_path, appid):
     return cls
 
 
-def add_local(lua_path, trust_path, class_name, name):
+def add_local(lua_path, trust_path, class_name, name, widget=False):
     class_name = class_name.strip()
     name = (name or class_name).strip()
     if not class_name:
@@ -66,7 +66,7 @@ def add_local(lua_path, trust_path, class_name, name):
     entries = lua_registry.read_entries(lua_path)
     if any(e["class"] == class_name for e in entries):
         raise ActionError("already registered: %s" % class_name)
-    entries.append({"kind": "local", "class": class_name, "name": name})
+    entries.append({"kind": "local", "class": class_name, "name": name, "widget": bool(widget)})
     _write_registry(lua_path, entries)
     trust_conf.add_class(trust_path, class_name)
     return class_name
@@ -82,11 +82,11 @@ def remove_local(lua_path, trust_path, class_name):
     return class_name
 
 
-def add_entry(lua_path, trust_path, kind, class_name, name=None):
+def add_entry(lua_path, trust_path, kind, class_name, name=None, widget=False):
     if kind == "steam":
         appid = class_name.split("_")[-1] if class_name.startswith("steam_app_") else class_name
-        return add_steam(lua_path, appid, name)
-    return add_local(lua_path, trust_path, class_name, name or class_name)
+        return add_steam(lua_path, appid, name, widget)
+    return add_local(lua_path, trust_path, class_name, name or class_name, widget)
 
 
 def remove_entry(lua_path, trust_path, class_name):

@@ -23,6 +23,9 @@ def build_parser():
     ap.add_argument("--steam", dest="steam_appid", metavar="APPID", help="Steam app id")
     ap.add_argument("--local", dest="local_class", metavar="CLASS", help="window class of a local game")
     ap.add_argument("--name", help="display name")
+    ap.add_argument("--widget", action="store_true", help=(
+        "idle/desktop-pet game: keep float + click-through but let it size itself "
+        "(no full-screen overlay enforcement, no hover bounce)"))
 
     rp = sub.add_parser("remove", help="unregister a game")
     rp.add_argument("--steam", dest="steam_appid", metavar="APPID", help="Steam app id")
@@ -45,9 +48,12 @@ def main(argv=None):
         try:
             if args.steam_appid:
                 g = steam.app_by_id(args.steam_appid)
-                cls = actions.add_steam(args.config, args.steam_appid, args.name or (g["name"] if g else None))
+                cls = actions.add_steam(args.config, args.steam_appid,
+                                        args.name or (g["name"] if g else None),
+                                        widget=args.widget)
             elif args.local_class:
-                cls = actions.add_local(args.config, args.trust, args.local_class, args.name or "")
+                cls = actions.add_local(args.config, args.trust, args.local_class,
+                                        args.name or "", widget=args.widget)
             else:
                 print("error: add needs --steam APPID or --local CLASS", file=sys.stderr)
                 return 2

@@ -5,8 +5,10 @@ END = "-- >> overlay-games-tool:end <<"
 
 # One registry entry per line:
 #   { kind = "steam", class = "steam_app_123", name = "Some Game" }
+#   { kind = "local", class = "My App", name = "My App", widget = true }
 _ENTRY = re.compile(
-    r'\{\s*kind\s*=\s*"([^"]*)"\s*,\s*class\s*=\s*"([^"]*)"\s*,\s*name\s*=\s*"([^"]*)"\s*\}'
+    r'\{\s*kind\s*=\s*"([^"]*)"\s*,\s*class\s*=\s*"([^"]*)"\s*,\s*name\s*=\s*"([^"]*)"'
+    r'(?:\s*,\s*widget\s*=\s*(true|false))?\s*\}'
 )
 
 
@@ -27,7 +29,12 @@ def read_entries(lua_path):
     for line in m.group(1).splitlines():
         hit = _ENTRY.search(line)
         if hit:
-            entries.append({"kind": hit.group(1), "class": hit.group(2), "name": hit.group(3)})
+            entries.append({
+                "kind": hit.group(1),
+                "class": hit.group(2),
+                "name": hit.group(3),
+                "widget": hit.group(4) == "true",
+            })
     return entries
 
 
@@ -53,7 +60,8 @@ def _render(entries):
         cls = e["class"].replace("\\", "\\\\").replace('"', '\\"')
         name = e["name"].replace("\\", "\\\\").replace('"', '\\"')
         kind = "steam" if e["kind"] == "steam" else "local"
-        lines.append('  { kind = "%s", class = "%s", name = "%s" },' % (kind, cls, name))
+        widget = ", widget = true" if e.get("widget") else ""
+        lines.append('  { kind = "%s", class = "%s", name = "%s"%s },' % (kind, cls, name, widget))
     lines.append("}")
     lines.append(END)
     return "\n".join(lines) + "\n"

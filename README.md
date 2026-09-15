@@ -23,6 +23,24 @@ Each registered game is wired into the two places that make an overlay work:
 After every change it runs `hyprctl reload` and
 `hyprctl trusted-clickthrough reload`, so the change is live immediately.
 
+### Widget mode
+
+Idle/desktop-pet games (many idle Steam games, "hover to expand" games) size
+themselves by cursor hover. Registering them as normal overlays makes the
+quickshell-avoidance audit fight their resizes (visible bouncing). Check
+**widget mode** in the GUI (or pass `--widget`) to keep float + transparency +
+click-through but let the game own its size — no full-screen enforcement, no
+bounce. Entry became: `..., widget = true`.
+
+### Known limitations (widget mode)
+
+- **No auto-focus** — widget-flagged windows aren't automatically
+  focused/activated when hovered. Known bug, to be handled later.
+- **No quickshell auto-avoid** — widget games are never resized/moved to line
+  up with the bar. Deliberate: games that don't support dynamic resize get
+  messed up by forced repositions, which causes jittering. Trade-off: an
+  expanded widget can temporarily cover the bar strip.
+
 > Steam launch options are **not** touched by this tool — set them once per game
 > in Steam → Properties → Launch options:
 > `WINE_LAYERED_OVERLAY_ALPHA=1 WINE_LAYERED_OVERLAY_INPUT_SHAPE=1 %command%`
@@ -57,6 +75,10 @@ After every change it runs `hyprctl reload` and
 # register / unregister a Steam app
 ./overlay-games add --steam 4126220
 ./overlay-games remove --steam 4126220
+
+# register an idle/desktop-pet game as a widget (keeps float + click-through,
+# lets the game size itself by cursor hover — no full-screen enforcement)
+./overlay-games add --steam 2348540 --widget
 
 # register / unregister a local game by window class
 ./overlay-games add --local VampireSurvivorsLike --name "My Local Game"
